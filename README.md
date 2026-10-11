@@ -61,7 +61,7 @@ Changez une seule fois de compte Windows. Sous le compte standard, ouvrez PowerS
 
 Pour LocalDesktop/Both, lancez Docker Desktop sous ce compte, examinez sa licence, choisissez le moteur Linux WSL2 et attendez son démarrage. Aucune distribution Linux personnelle n’est imposée. Le bootstrap ne change pas le contexte actif ni le défaut WSL de l’administrateur.
 
-Connectez Claude ou Codex hors des journaux et testez une vraie conversation. GitHub et Grok se connectent séparément.
+Connectez Claude ou Codex hors des journaux et testez une vraie conversation. GitHub, GitLab et Grok se connectent séparément. GitLab CLI (`glab`) est installé pour tous les comptes en phase 20 ; exécutez `glab auth login` sous le compte standard cible (ou `glab auth login --hostname gitlab.votre-domaine.tld` pour votre instance).
 
 ```powershell
 codex login
@@ -79,7 +79,7 @@ La phase 70 vérifie le socle, les extensions, les chemins et les moteurs sélec
 
 | Outils | Périmètre |
 |---|---|
-| PowerShell 7 (MSI), Git, GitHub CLI, VS Code, Node LTS, Python | Machine, `--scope machine` |
+| PowerShell 7 (MSI), Git, GitHub CLI, GitLab CLI (glab), VS Code, Node LTS, Python | Machine, `--scope machine` |
 | uv/uvx, Sysinternals, Docker CLI seul | Paquets WinGet, périmètre machine explicite |
 | Docker Desktop | Machine, sans seconde copie du CLI en Both |
 | Windows Terminal | Exception MSIX : enregistrement/installation sous le compte standard, phase 30 |

@@ -22,7 +22,7 @@ Invoke-Phase '70-validation' {
     $status=if ([int]$os.BuildNumber -ge 22631 -and $cv.EditionID -in @('Professional','ProfessionalN') -and $env:PROCESSOR_ARCHITECTURE -eq 'AMD64') {'PASS'} else {'FAIL'}
     Add-Result 'Windows target' $status "$($os.Caption) $($os.BuildNumber); x64 Pro required"
     $null = Test-NodeMinimum
-    foreach ($tool in @('pwsh.exe','npm.cmd','git.exe','code','python.exe','uv.exe','uvx.exe','gh.exe','codex','claude')) { $null = Test-Tool $tool }
+    foreach ($tool in @('pwsh.exe','npm.cmd','git.exe','code','python.exe','uv.exe','uvx.exe','gh.exe','glab.exe','codex','claude')) { $null = Test-Tool $tool }
     $null = Test-Tool grok @('version')
     foreach ($id in @('Microsoft.WindowsTerminal','Microsoft.Sysinternals.Suite')) {
         $status = if (Get-WinGetState $id) {'PASS'} else {'FAIL'}

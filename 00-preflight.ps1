@@ -36,7 +36,7 @@ Invoke-Phase '00-preflight' {
         }
     }
     $null = Test-Tool winget.exe
-    foreach ($tool in @('pwsh.exe','git.exe','node.exe','npm.cmd','python.exe','uv.exe','uvx.exe','gh.exe','docker.exe','codex.cmd','claude.exe','grok.cmd')) {
+    foreach ($tool in @('pwsh.exe','git.exe','node.exe','npm.cmd','python.exe','uv.exe','uvx.exe','gh.exe','glab.exe','docker.exe','codex.cmd','claude.exe','grok.cmd')) {
         $null = Test-Tool $tool -Optional
     }
     foreach ($profile in @(Get-NetConnectionProfile -ErrorAction SilentlyContinue)) {
