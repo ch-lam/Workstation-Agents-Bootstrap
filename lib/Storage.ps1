@@ -5,7 +5,7 @@
     foreach ($path in @($env:SystemRoot,$env:TEMP,$env:LOCALAPPDATA,$env:APPDATA,$env:ProgramFiles,$env:USERPROFILE)) {
         if ($path) { $items.Add([pscustomobject]@{Role='Windows / installers / user data';Path=$path;MinimumGB=$systemMinimum}) }
     }
-    $items.Add([pscustomobject]@{Role='Bootstrap logs';Path=(Split-Path $PSScriptRoot -Parent);MinimumGB=$systemMinimum})
+    $items.Add([pscustomobject]@{Role='Bootstrap logs';Path=$env:LOCALAPPDATA;MinimumGB=$systemMinimum})
     foreach ($command in @('pwsh.exe','git.exe','code.cmd','node.exe','npm.cmd','python.exe','uv.exe','gh.exe','docker.exe','codex.cmd','claude.exe','grok.cmd')) {
         $tool=Get-Command $command -ErrorAction SilentlyContinue
         if ($tool -and $tool.Source -and [IO.Path]::IsPathRooted($tool.Source)) {

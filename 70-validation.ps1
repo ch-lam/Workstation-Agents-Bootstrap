@@ -7,12 +7,14 @@ if (-not $ConfigPath) {
 . (Join-Path $PSScriptRoot 'lib\Common.ps1')
 Invoke-Phase '70-validation' {
     Require-User
-    if (-not $script:Config.BackendLoginConfirmed) {
+    if (-not (Test-BackendConfirmation)) {
         Add-Result 'Backend session' FAIL 'Validation non lancee : connecter et tester Claude OU Codex, puis confirmer le login AVANT de lancer la phase 70.'
         Add-Result 'LOGIN REQUIS AVANT PHASE 70' MANUAL (Get-BackendLoginInstructions $script:Root $script:ActiveConfigPath)
         return
     }
     Test-WindowsUpdates
+    Test-MachineTools
+    Test-OracleDeveloper -EffectiveEnvironment
     Test-StorageVolumes
     if (Test-PendingReboot) { Add-Result 'Restart' FAIL 'Pending restart; restart first' }
     $os=Get-CimInstance Win32_OperatingSystem
@@ -38,7 +40,9 @@ Invoke-Phase '70-validation' {
     Test-TimeSync
     if (Get-Command code -ErrorAction SilentlyContinue) {
         $extensions=((Invoke-Native code @('--list-extensions') -Quiet).Output -split "`r?`n")
-        foreach ($ext in $script:Config.Extensions) {
+        $expectedExtensions=@($script:Config.Extensions)
+        if ($script:Config.OracleDeveloper.Enabled) { $expectedExtensions+=$script:Config.OracleDeveloper.VSCodeExtension }
+        foreach ($ext in @($expectedExtensions | Select-Object -Unique)) {
             $status=if ($extensions -contains $ext) {'PASS'} else {'FAIL'}
             Add-Result $ext $status 'Extension inventory'
         }
@@ -50,21 +54,14 @@ Invoke-Phase '70-validation' {
             Add-Result "Git $key" $status 'Identity presence checked; configure before commits'
         }
     }
-    if ($script:Config.EnableDocker) {
+    if (Test-LocalDockerEnabled) {
         $r=Invoke-Native wsl.exe @('--version') -Quiet
         $m=[regex]::Match(($r.Output -replace "`0",''),'\d+\.\d+\.\d+')
         $status=if ($m.Success -and [version]$m.Value -ge [version]'2.1.5') {'PASS'} else {'FAIL'}
         if ($status -eq 'PASS') { Add-Result 'WSL >=2.1.5' PASS $r.Output -ConsoleDetail $m.Value }
         else { Add-Result 'WSL >=2.1.5' FAIL $r.Output }
-        $null=Test-Tool docker.exe
-        $null=Test-Tool docker.exe @('compose','version')
-        if (Get-Command docker.exe -ErrorAction SilentlyContinue) {
-            $r=Invoke-Native docker.exe @('info','--format','{{.OSType}}') -Quiet
-            $status=if ($r.Output.Trim() -eq 'linux') {'PASS'} else {'FAIL'}
-            Add-Result 'Docker running Linux engine' $status $r.Output
-            Add-Result 'Container smoke test' MANUAL 'Optional outside CheckOnly: docker run --rm hello-world (downloads an image).'
-        }
     }
-    Add-Result 'Backend session' PASS 'Conversation Claude ou Codex confirmee par utilisateur (BackendLoginConfirmed=true) ; confirmation declaree, pas une verification automatique de session.'
+    Test-DockerEngines
+    Add-Result 'Backend session' PASS 'Conversation Claude ou Codex confirmee pour le SID courant ; declaration humaine, pas une verification automatique de session.'
     Add-Result 'Credentials' INFO 'No token files or credential environment values read. Login state is not inferred from binary presence.'
 } $ConfigPath -CheckOnly:$CheckOnly -WindowsUpdateMandatory:$WindowsUpdateMandatory

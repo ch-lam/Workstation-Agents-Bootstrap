@@ -5,6 +5,7 @@ $null=New-Item -ItemType Directory -Path (Join-Path $scratch 'lib') -Force
 try {
     Copy-Item (Join-Path $root 'Invoke-Bootstrap.ps1') $scratch
     Copy-Item (Join-Path $root 'lib\Configuration.ps1') (Join-Path $scratch 'lib')
+    Copy-Item (Join-Path $root 'lib\Settings.ps1') (Join-Path $scratch 'lib')
     Copy-Item (Join-Path $root 'config.psd1') $scratch
     $files=@{'00'='00-preflight';'10'='10-windows-base';'20'='20-winget-packages';'50'='50-docker-wsl';'30'='30-dev-runtime';'40'='40-ai-cli';'60'='60-workstation-config'}
     foreach($phase in $files.Keys) {

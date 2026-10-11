@@ -25,6 +25,7 @@ if ($Stage) {
 $engine=(Get-Process -Id $PID).Path
 $ConfigPath=(Resolve-Path -LiteralPath $ConfigPath).Path
 . (Join-Path $PSScriptRoot 'lib\Configuration.ps1')
+$null=Read-BootstrapConfig $ConfigPath
 $failed=$false
 $orderedPhases=@('00','10','20','50','30','40','60','70')
 foreach ($number in @($orderedPhases | Where-Object {$_ -in $Phase})) {
@@ -39,7 +40,8 @@ foreach ($number in @($orderedPhases | Where-Object {$_ -in $Phase})) {
         $phaseExit=$LASTEXITCODE
     } finally { $env:AGENT_BOOTSTRAP_LAUNCHER=$previousLauncher }
     if ($phaseExit -eq 3010) {
-        Write-Host '[MANUAL] Redemarrer Windows, puis reprendre dans un terminal ADMINISTRATEUR du meme compte.' -ForegroundColor Yellow
+        $resumeContext=if ($number -in @('10','20','50')) {'ADMINISTRATEUR; terminer 10,20,50 avant de changer de compte'} else {'UTILISATEUR STANDARD; rester sous le compte cible'}
+        Write-Host "[MANUAL] Redemarrer Windows, puis reprendre dans le contexte $resumeContext." -ForegroundColor Yellow
         $resume=Get-BootstrapLaunchCommand (Join-Path $PSScriptRoot 'Invoke-Bootstrap.ps1') $ConfigPath -Phase ($Phase -join ',')
         Write-Host $resume
         exit 3010

@@ -7,9 +7,12 @@ if (-not $ConfigPath) {
 . (Join-Path $PSScriptRoot 'lib\Common.ps1')
 Invoke-Phase '20-winget-packages' {
     Require-Admin
-    Ensure-WinGet 'Microsoft.PowerShell' @('--installer-type','wix')
-    foreach ($id in @('Microsoft.WindowsTerminal','Git.Git','Microsoft.VisualStudioCode','OpenJS.NodeJS.LTS','GitHub.cli','Microsoft.Sysinternals.Suite')) {
-        Ensure-WinGet $id
+    foreach ($package in @(Get-MachinePackagePlan)) {
+        Ensure-WinGet $package.Id $package.Extra -Scope machine
+        if ($script:Reboot) { return }
     }
+    Ensure-OracleDeveloper
+    if (-not $script:Check -and -not $script:Reboot) { Test-MachineTools }
+    Add-Result 'Windows Terminal' INFO 'Packaged MSIX is registered per user in phase 30; no administrator-profile installation.'
     Add-Result 'PATH' MANUAL 'Close and reopen the terminal after installation; use PowerShell 7 for remaining user phases.'
 } $ConfigPath -CheckOnly:$CheckOnly -WindowsUpdateMandatory:$WindowsUpdateMandatory

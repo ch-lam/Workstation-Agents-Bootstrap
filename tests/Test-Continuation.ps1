@@ -1,6 +1,7 @@
 ﻿$ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 . (Join-Path $root 'lib\Configuration.ps1')
+function Test-BackendConfirmation { return $false }
 foreach ($phase in @('00','10','20','30','40','50','60')) {
     $hint=Get-BootstrapContinuation $root (Join-Path $root 'config.psd1') $phase $false
     $admin=$phase -in @('00','10','20')
@@ -13,7 +14,8 @@ $null=New-Item -ItemType Directory -Path (Join-Path $scratch 'lib') -Force
 try {
     Copy-Item (Join-Path $root 'Invoke-Bootstrap.ps1') $scratch
     Copy-Item (Join-Path $root 'lib\Configuration.ps1') (Join-Path $scratch 'lib')
-    Set-Content (Join-Path $scratch 'config.psd1') '@{}'
+    Copy-Item (Join-Path $root 'lib\Settings.ps1') (Join-Path $scratch 'lib')
+    Copy-Item (Join-Path $root 'config.psd1') $scratch
     Set-Content (Join-Path $scratch '20-winget-packages.ps1') 'param($ConfigPath,[switch]$CheckOnly) exit 0'
     $engine=(Get-Process -Id $PID).Path
     $output=& $engine -NoProfile -ExecutionPolicy RemoteSigned -File (Join-Path $scratch 'Invoke-Bootstrap.ps1') -Phase 20 -ConfigPath (Join-Path $scratch 'config.psd1')

@@ -31,14 +31,14 @@ try {
     $wizardAnswers=New-Object 'System.Collections.Generic.Queue[string]'
     function Read-Host { param($Prompt); if ($wizardAnswers.Count -eq 0) { throw "Unexpected prompt: $Prompt" }; return $wizardAnswers.Dequeue() }
     $configPath=Join-Path $scratch 'config.local.psd1'
-    foreach ($answer in @('non','oui',"O'Brien",'user@example.invalid','','non','oui')) { $wizardAnswers.Enqueue($answer) }
+    foreach ($answer in @('None','oui',"O'Brien",'user@example.invalid','','non','oui')) { $wizardAnswers.Enqueue($answer) }
     & (Join-Path $root 'Configure-Bootstrap.ps1') -Action Configuration -ConfigPath $configPath
     $config=Import-PowerShellDataFile -LiteralPath $configPath
-    Assert-Configuration ($config.EnableDocker -eq $false -and $config.GitUserName -eq "O'Brien" -and $config.Extensions.Count -eq 7 -and $config.BackendLoginConfirmed -eq $false) 'Question/answer flow creates complete usable config with preserved defaults'
-    foreach ($answer in @('oui','oui','','','','non')) { $wizardAnswers.Enqueue($answer) }
+    Assert-Configuration ($config.DockerMode -eq 'None' -and $config.GitUserName -eq "O'Brien" -and $config.Extensions.Count -eq 7 -and $config.BackendLoginConfirmed -eq $false) 'Question/answer flow creates complete usable config with preserved defaults'
+    foreach ($answer in @('Both','oui','','','','non')) { $wizardAnswers.Enqueue($answer) }
     & (Join-Path $root 'Configure-Bootstrap.ps1') -Action Configuration -ConfigPath $configPath -PreviewOnly
     $after=Import-PowerShellDataFile -LiteralPath $configPath
-    Assert-Configuration ($after.EnableDocker -eq $false) 'PreviewOnly does not save changed answers'
+    Assert-Configuration ($after.DockerMode -eq 'None') 'PreviewOnly does not save changed answers'
     $wizardAnswers.Enqueue('oui')
     $null=Save-DataFile $config $configPath
     Assert-Configuration (@(Get-ChildItem -LiteralPath $scratch -Filter '*.bak').Count -eq 1) 'Existing configuration backed up before replacement'
@@ -46,10 +46,8 @@ try {
     $extended.UnknownOption='Z:\missing\release.psd1'
     $extended.AnotherUnknownOption='Z:\missing'
     [IO.File]::WriteAllText($configPath,(ConvertTo-DataLiteral $extended),[Text.UTF8Encoding]::new($true))
-    foreach ($answer in @('oui','oui')) { $wizardAnswers.Enqueue($answer) }
-    & (Join-Path $root 'Configure-Bootstrap.ps1') -Action ConfirmLogin -ConfigPath $configPath
-    $saved=Import-PowerShellDataFile -LiteralPath $configPath
-    Assert-Configuration ($saved.BackendLoginConfirmed -and -not $saved.ContainsKey('UnknownOption') -and -not $saved.ContainsKey('AnotherUnknownOption') -and $saved.NoSleepOnAC -eq $extended.NoSleepOnAC) 'Saving config ignores unknown keys and preserves workstation settings'
+    $saved=Read-BootstrapConfig $configPath
+    Assert-Configuration (-not $saved.ContainsKey('UnknownOption') -and -not $saved.ContainsKey('AnotherUnknownOption') -and $saved.NoSleepOnAC -eq $extended.NoSleepOnAC) 'Normalization ignores unknown legacy keys and preserves workstation settings'
     Write-Host "$passed configuration checks passed."
 } finally {
     $resolved=[IO.Path]::GetFullPath($scratch)

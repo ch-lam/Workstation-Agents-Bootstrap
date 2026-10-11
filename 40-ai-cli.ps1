@@ -12,7 +12,7 @@ Invoke-Phase '40-ai-cli' {
     Ensure-NpmCLI 'codex' '@openai/codex' $script:Config.CodexVersion
     # Official native WinGet installation; npm Claude installation is unnecessary.
     if (Get-Command claude -ErrorAction SilentlyContinue) { $null = Test-Tool claude }
-    else { Ensure-WinGet 'Anthropic.ClaudeCode' }
+    else { Ensure-WinGet 'Anthropic.ClaudeCode' -Scope user }
     Ensure-NpmCLI 'grok' '@xai-official/grok' $script:Config.GrokVersion @('version')
     Add-Result 'Login' MANUAL 'Outside logs: codex login; claude (browser prompts); grok login; gh auth login. Test an ordinary Codex or Claude conversation.'
 } $ConfigPath -CheckOnly:$CheckOnly -WindowsUpdateMandatory:$WindowsUpdateMandatory

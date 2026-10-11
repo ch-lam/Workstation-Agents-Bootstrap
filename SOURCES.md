@@ -1,4 +1,4 @@
-# Sources officielles vérifiées — 2026-10-02
+# Sources officielles — vérification initiale 2026-10-02, adaptation multicomptes 2026-10-11
 
 Les IDs sont ceux du catalogue Microsoft WinGet ou ceux explicitement documentés par l'éditeur. Les versions de ce catalogue évoluent ; les scripts vérifient l'ID exact avant une installation et conservent les contrôles d'intégrité WinGet. Le catalogue communautaire hébergé par Microsoft n'est pas une certification Microsoft de chaque éditeur.
 
@@ -35,3 +35,17 @@ Claude propose l'installateur natif PowerShell et WinGet ; le playbook choisit W
 Pour réutiliser ce playbook plusieurs mois plus tard, relire ces liens et `winget show --id <ID> --exact --source winget`, notamment les OS supportés, les licences et les modalités d'authentification.
 
 Windows Update : API officielle IUpdateSearcher.Search (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdatesearcher-search), criteres IsInstalled=0 and IsHidden=0 ; BrowseOnly indique les mises a jour facultatives. OperationResultCode (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/ne-wuapi-operationresultcode) : seul orcSucceeded=2 est traite comme recherche complete.
+
+## Adaptation multicomptes
+
+- [WinGet install / scope](https://learn.microsoft.com/en-us/windows/package-manager/winget/install) : sélection explicite machine/utilisateur, sans désactivation des hashes ni repli de périmètre.
+- [Windows Terminal distributions](https://learn.microsoft.com/en-us/windows/terminal/distributions) : distribution MSIX personnelle retenue en phase 30. Le bootstrap n'utilise pas le mode portable qui partagerait les paramètres près des binaires.
+- [uv manifest](https://github.com/microsoft/winget-pkgs/blob/master/manifests/a/astral-sh/uv/0.12.13/astral-sh.uv.installer.yaml) : archive officielle avec exécutables portables uv/uvx ; installation machine demandée à WinGet.
+- [Docker CLI package](https://github.com/microsoft/winget-pkgs/tree/master/manifests/d/Docker/DockerCLI) : client autonome pour RemoteCLI ; pas de service dockerd enregistré.
+- [Docker Windows installation et droits](https://docs.docker.com/desktop/setup/install/windows-install/) : mode all-users, prérequis WSL2, conditions d'utilisation de docker-users et limites du support des VM.
+- [Docker SSH contexts](https://docs.docker.com/engine/security/protect-access/) : transport SSH et protection du socket ; ne pas exposer TCP 2375.
+- [Oracle SQLcl](https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/) et [documentation par version](https://docs.oracle.com/en/database/oracle/sql-developer-command-line/index.html) : distribution officielle, exigences Java à sélectionner ensemble. Procédure manuelle reproductible dans docs/ORACLE.md.
+- [Oracle Developer Tools for VS Code](https://docs.oracle.com/en/database/oracle/oracle-database/21/xeinw/introduction.html) : extension Oracle.oracledevtools demandée, distincte de SQL Developer for VS Code.
+- [OpenRouter](https://openrouter.ai/docs/quickstart) : URL API et intégration fournisseur ; aucune clé incluse dans le bootstrap.
+
+Les paquets restent soumis à l'évolution du catalogue. Les tests automatisés simulent les installateurs et ne remplacent pas la qualification des manifestes effectivement sélectionnés dans une VM Windows. Les fonctionnalités d'auto-update propres aux produits peuvent différer de l'idempotence du bootstrap ; prévoir leur maintenance séparément.

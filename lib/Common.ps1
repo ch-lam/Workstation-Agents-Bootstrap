@@ -8,6 +8,9 @@ $script:WindowsUpdateMandatory = $false
 . (Join-Path $PSScriptRoot 'Storage.ps1')
 . (Join-Path $PSScriptRoot 'WindowsUpdate.ps1')
 . (Join-Path $PSScriptRoot 'Configuration.ps1')
+. (Join-Path $PSScriptRoot 'Provisioning.ps1')
+. (Join-Path $PSScriptRoot 'Docker.ps1')
+. (Join-Path $PSScriptRoot 'Oracle.ps1')
 
 function Test-Administrator {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -15,6 +18,8 @@ function Test-Administrator {
 }
 function Add-Result {
     param([string]$Name, [ValidateSet('PASS','FAIL','WARN','PLAN','MANUAL','INFO','UNKNOWN')][string]$Status, [string]$Detail, [switch]$LogOnly,[AllowEmptyString()][string]$ConsoleDetail)
+    $Detail=Protect-LogText $Detail
+    if ($ConsoleDetail) { $ConsoleDetail=Protect-LogText $ConsoleDetail }
     $script:Rows.Add([pscustomobject]@{ Name=$Name; Status=$Status; Detail=$Detail })
     $line = '{0:o} [{1}] {2}: {3}' -f (Get-Date),$Status,$Name,$Detail
     $color=switch ($Status) {
@@ -52,11 +57,9 @@ function Invoke-Native {
     try { $output = @(& $native.Source @Arguments 2>&1 | ForEach-Object { $_.ToString() }); $code = $global:LASTEXITCODE }
     finally { $ErrorActionPreference = $old }
     if ($null -eq $code) { throw "Unable to start native command: $Command" }
-    foreach ($line in $output) {
-        Add-Content -LiteralPath $script:Log -Value $line -Encoding UTF8
-        if (-not $Quiet) { Write-Verbose $line }
-    }
-    if ($Allowed -notcontains $code) { throw "$Command failed (exit $code). $($output -join ' ')" }
+    # npm, proxies and SSH may echo credentials: never persist arbitrary child output.
+    Add-Content -LiteralPath $script:Log -Value ("Native exit: {0}; code={1}" -f [IO.Path]::GetFileName($native.Source),$code) -Encoding UTF8
+    if ($Allowed -notcontains $code) { throw "$Command failed (exit $code). Raw output omitted to protect credentials; diagnose manually outside bootstrap logs." }
     [pscustomobject]@{ Code=$code; Output=($output -join "`n") }
 }
 function Invoke-Change {
@@ -66,7 +69,7 @@ function Invoke-Change {
     Add-Result $Name PASS 'Applied'
 }
 function Require-Admin {
-    if (-not $script:Check -and -not (Test-Administrator)) { throw 'Open an elevated terminal under the SAME Windows account for this phase.' }
+    if (-not $script:Check -and -not (Test-Administrator)) { throw 'Run phases 10,20,50 in an administrator account before switching to the standard workstation account.' }
 }
 function Require-User {
     if (-not $script:Check -and (Test-Administrator)) { throw 'Run this phase in a non-elevated terminal under the workstation user account.' }
@@ -74,7 +77,7 @@ function Require-User {
 function Refresh-Path {
     $parts = @($env:PATH,[Environment]::GetEnvironmentVariable('PATH','Machine'),[Environment]::GetEnvironmentVariable('PATH','User'))
     # Only change this process, never rewrite the persistent PATH.
-    $env:PATH = ($parts -join ';')
+    $env:PATH = ((($parts -join ';') -split ';' | Where-Object {$_} | Select-Object -Unique) -join ';')
 }
 function Get-PendingRebootReasons {
     $keys = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending',
@@ -101,13 +104,12 @@ function Test-Tool {
     $resolved=Get-Command $Command -ErrorAction Stop
     if ($Command -eq 'python.exe' -and $resolved.Source -like '*\Microsoft\WindowsApps\*') {
         $status = if ($Optional) {'WARN'} else {'FAIL'}
-        Add-Result $Command $status 'Windows Store execution alias detected; install Python in phase 30, then reopen terminal or disable the alias if it still shadows Python.'
+        Add-Result $Command $status 'Windows Store execution alias detected; install machine Python in phase 20, then reopen terminal or disable the alias if it still shadows Python.'
         return $false
     }
     try {
         $r = Invoke-Native $Command $Arguments -Quiet
-        Add-Result $Command PASS ($r.Output+"
-Path: $($resolved.Source)") -ConsoleDetail ''
+        Add-Result $Command PASS ("Command succeeded; path: $($resolved.Source)") -ConsoleDetail ''
         return $true
     } catch {
         $status = if ($Optional) {'WARN'} else {'FAIL'}
@@ -122,26 +124,30 @@ function Get-RAMLevel {
     return 'PASS'
 }
 function Get-WinGetState {
-    param([string]$Id)
+    param([string]$Id,[ValidateSet('','machine','user')][string]$Scope='')
     # Only the documented no-applications HRESULT means absent; other errors stop.
     $noApps = -1978335212 # 0x8A150014
-    $r = Invoke-Native 'winget.exe' @('list','--id',$Id,'--exact','--source','winget','--disable-interactivity') @(0,$noApps) -Quiet
+    $arguments=@('list','--id',$Id,'--exact','--source','winget','--disable-interactivity')
+    if ($Scope) { $arguments+=@('--scope',$Scope) }
+    $r = Invoke-Native 'winget.exe' $arguments @(0,$noApps) -Quiet
     return ($r.Code -eq 0)
 }
 function Ensure-WinGet {
-    param([string]$Id,[string[]]$Extra=@())
+    param([string]$Id,[string[]]$Extra=@(),[ValidateSet('machine','user')][string]$Scope='machine')
     if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
         Add-Result $Id FAIL 'WinGet absent; repair App Installer using Microsoft Store'; return
     }
-    if (Get-WinGetState $Id) { Add-Result $Id PASS 'Already installed; no automatic upgrade'; return }
+    if ($Extra -contains '--scope') { throw 'Use the Scope parameter, not Extra, for installation scope' }
+    if (Get-WinGetState $Id -Scope $Scope) { Add-Result $Id PASS "Already installed ($Scope); no automatic upgrade"; return }
+    if (Get-WinGetState $Id) { throw "$Id exists in a different scope. Review migration manually; no duplicate installation or automatic uninstall." }
     Invoke-Change "Install $Id" {
         # Explicit source, exact IDs and normal hash checks. Never override hash/security checks.
         $null = Invoke-Native 'winget.exe' (@('show','--id',$Id,'--exact','--source','winget','--accept-source-agreements','--disable-interactivity'))
         $r = Invoke-Native 'winget.exe' (@('install','--id',$Id,'--exact','--source','winget','--silent',
-            '--accept-source-agreements','--accept-package-agreements','--disable-interactivity') + $Extra) @(0,3010,1641)
-        if ($r.Code -ne 0) { $script:Reboot = $true }
+            '--accept-source-agreements','--accept-package-agreements','--disable-interactivity','--scope',$Scope) + $Extra) @(0,3010,1641)
+        if ($r.Code -ne 0) { $script:Reboot = $true; return }
         Refresh-Path
-        if (-not (Get-WinGetState $Id)) { throw "Installation not detected: $Id" }
+        if (-not (Get-WinGetState $Id -Scope $Scope)) { throw "Installation not detected in requested scope: $Id ($Scope)" }
     }
 }
 function Test-NodeMinimum {
@@ -156,6 +162,8 @@ function Test-NodeMinimum {
 }
 function Ensure-NpmCLI {
     param([string]$Command,[string]$Package,[string]$Version,[string[]]$VersionArguments=@('--version'))
+    $prefix=Get-UserNpmPrefix
+    Ensure-PathEntry $prefix User
     if (Get-Command $Command -ErrorAction SilentlyContinue) {
         if (-not (Test-Tool $Command $VersionArguments)) { throw "Existing $Command is broken; resolve before reinstalling." }
         $r = Invoke-Native npm.cmd @('list','-g',$Package,'--depth=0','--json') @(0,1) -Quiet
@@ -165,7 +173,7 @@ function Ensure-NpmCLI {
             throw "Existing $Command is not registered as official npm package $Package. Review its origin/install method and PATH before using this npm profile; no unknown CLI is silently accepted."
         }
         $actual=$dependencyProperty.Value.PSObject.Properties[$Package].Value.version
-        Add-Result "Official package $Package" PASS $actual
+        Add-Result "Official package $Package" PASS 'Registered in the current npm prefix'
         $prefix=(Invoke-Native npm.cmd @('prefix','--global') -Quiet).Output.Trim()
         $resolved=Get-Command ($Command+'.cmd') -ErrorAction SilentlyContinue
         if (-not $resolved -or -not $resolved.Source.Equals((Join-Path $prefix ($Command+'.cmd')),[StringComparison]::OrdinalIgnoreCase)) {
@@ -249,8 +257,9 @@ function Invoke-Phase {
     $script:Check = [bool]$CheckOnly
     $script:ActivePhase=$Name
     $script:ActiveConfigPath=[IO.Path]::GetFullPath($ConfigPath)
-    $script:Config = Import-PowerShellDataFile -LiteralPath $ConfigPath
-    $logs = Join-Path $script:Root 'logs'
+    $script:Config = Read-BootstrapConfig $ConfigPath
+    $kind=if ($Name.Substring(0,2) -in @('10','20','50')) {'machine-logs'} else {'user-logs'}
+    $logs = Join-Path (Get-BootstrapUserDirectory) $kind
     $null = New-Item -ItemType Directory -Path $logs -Force
     $script:Log = Join-Path $logs ("{0}-{1}-{2}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss-fff'),$PID,$Name)
     $exitCode = 0

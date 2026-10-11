@@ -14,15 +14,15 @@ Invoke-Phase '00-preflight' {
     Add-Result 'Windows 11 Pro' $status "$($os.Caption), build $($os.BuildNumber), edition $($cv.EditionID). Windows must also remain in Microsoft support."
     $status = if ([Environment]::Is64BitProcess -and $env:PROCESSOR_ARCHITECTURE -eq 'AMD64') {'PASS'} else {'FAIL'}
     Add-Result 'Architecture' $status 'This playbook targets native Windows x64, including official Grok x64.'
-    Add-Result 'Elevation' INFO "Administrator=$(Test-Administrator); use same account throughout"
+    Add-Result 'Elevation' INFO "Administrator=$(Test-Administrator); finish 10,20,50 in the administrator account, then switch once for 30,40,60,70"
     $ram = [Math]::Round($machine.TotalPhysicalMemory/1GB,1)
     $status = Get-RAMLevel $ram $script:Config.MinimumRAMGB $script:Config.RecommendedRAMGB
     Add-Result 'RAM' $status "$ram GB usable; minimum $($script:Config.MinimumRAMGB), recommended $($script:Config.RecommendedRAMGB) nominal (0.5 GB allowance for hardware reservation)"
     Test-StorageVolumes
-    if ($script:Config.EnableDocker) {
-        $virtualized = $machine.HypervisorPresent -or ($cpu.VirtualizationFirmwareEnabled -and $cpu.SecondLevelAddressTranslationExtensions)
-        $status = if ($virtualized) {'PASS'} else {'FAIL'}
-        Add-Result 'Virtualization / SLAT' $status 'Enable virtualization in firmware when missing'
+    if (Test-LocalDockerEnabled) {
+        $virtualized = $cpu.VirtualizationFirmwareEnabled -and $cpu.SecondLevelAddressTranslationExtensions
+        $status = if ($virtualized) {'PASS'} elseif ($machine.HypervisorPresent) {'WARN'} else {'FAIL'}
+        Add-Result 'Virtualization / SLAT' $status 'Hypervisor presence alone does not prove nested virtualization. A VM requires host-side nested virtualization and a working WSL2/Desktop engine; Proxmox support is not assumed.'
         if (Test-Administrator) {
             foreach ($feature in @('Microsoft-Windows-Subsystem-Linux','VirtualMachinePlatform')) {
                 $state=Get-WindowsOptionalFeature -Online -FeatureName $feature

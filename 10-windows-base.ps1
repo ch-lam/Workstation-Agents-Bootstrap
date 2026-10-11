@@ -18,7 +18,7 @@ Invoke-Phase '10-windows-base' {
             }
         } else { Add-Result 'No sleep on AC' PASS 'Already set; battery, display and lid policy unchanged' }
     }
-    if ($script:Config.EnableDocker) {
+    if (Test-LocalDockerEnabled) {
         foreach ($feature in @('Microsoft-Windows-Subsystem-Linux','VirtualMachinePlatform')) {
             $state = Get-WindowsOptionalFeature -Online -FeatureName $feature
             if ($state.State -eq 'Enabled') { Add-Result $feature PASS 'Enabled' }
