@@ -9,6 +9,7 @@ $script:WindowsUpdateMandatory = $false
 . (Join-Path $PSScriptRoot 'WindowsUpdate.ps1')
 . (Join-Path $PSScriptRoot 'Configuration.ps1')
 . (Join-Path $PSScriptRoot 'Provisioning.ps1')
+. (Join-Path $PSScriptRoot 'Portable.ps1')
 . (Join-Path $PSScriptRoot 'Docker.ps1')
 . (Join-Path $PSScriptRoot 'Oracle.ps1')
 

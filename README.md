@@ -40,7 +40,7 @@ Si Oracle est activé, préparez SQLcl et son JDK selon [ORACLE.md](docs/ORACLE.
 ```
 
 - **10** : alimentation sur secteur si demandée ; WSL/VirtualMachinePlatform uniquement en LocalDesktop/Both ; resynchronisation de l’heure seulement si demandée.
-- **20** : applications machine, Python, uv/uvx et préparation des chemins Oracle. Contrôle de la résolution des outils système.
+- **20** : applications machine, Python, uv/uvx et préparation des chemins Oracle. Contrôle de la résolution des outils système. Pour le paquet portable uv, vérification et correction ciblée des droits de lecture/exécution du groupe Utilisateurs avant le passage de compte.
 - **50** : client SSH si distant ; Docker CLI seul ou Docker Desktop/WSL selon le mode ; contrôle du socle avant le passage de compte. Aucun serveur SSH installé, aucune ouverture de port.
 
 Le code de sortie **3010** signifie redémarrage requis. Redémarrez et reprenez la commande affichée sous l’administrateur. Les installations conformes restent en place, sans mise à jour implicite. Les erreurs de périmètre doivent être résolues dans ce bloc, sans duplication ni désinstallation automatique.
@@ -91,6 +91,8 @@ L’exception Terminal utilise la distribution packagée officielle, qui ne néc
 Les contrôles WinGet distinguent les périmètres. Si un paquet n’existe que dans un autre périmètre visible, l’installation s’arrête pour une migration explicite. Les inventaires ne permettent pas de certifier tous les profils Windows hors session : le contrôle final dans le compte cible reste indispensable. Une installation personnalisée hors des racines système est signalée ; ne déplacez pas automatiquement ses fichiers.
 
 Les paquets portables installés machine peuvent avoir des liens dans Program Files\WinGet\Links. Ne donnez pas aux utilisateurs le droit de modifier ces binaires. Certains outils Sysinternals nécessitent une élévation pour leurs fonctions avancées ; leur accessibilité ne leur confère pas ces droits.
+
+WinGet peut extraire uv sans droits suffisants pour les autres comptes. La phase 20 accorde automatiquement `RX` au groupe Utilisateurs (SID indépendant de la langue) sur le seul paquet machine `astral-sh.uv`, y compris lorsque celui-ci est déjà installé. Elle vérifie les cibles des liens uv/uvx, refuse les jonctions/liens dans le paquet et contrôle les ACL après correction. Les racines portables personnalisées et les règles de refus nécessitent une revue manuelle. `-CheckOnly` n'altère aucune permission. Les phases 30 et 70 contrôlent toujours l'exécution réelle sous le compte cible.
 
 ## Docker local et distant
 

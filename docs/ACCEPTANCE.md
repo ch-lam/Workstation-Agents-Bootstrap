@@ -10,7 +10,9 @@ Utiliser une VM Windows 11 Pro x64 de qualification avec deux comptes distincts,
 | Deuxième exécution | Aucun doublon d’installation, PATH ou contexte ; aucune mise à jour implicite |
 | Mauvais périmètre existant | Erreur explicite avant création d’un doublon ; aucune désinstallation |
 | UAC avec autre identité | Aucune configuration personnelle destinée au compte standard écrite dans le profil administrateur |
-| Nouveau terminal standard | PowerShell, Git, Node/npm, Python, uv/uvx, VS Code et gh fonctionnent ; Sysinternals est accessible sans lancer une fonction privilégiée |
+| Nouveau terminal standard | PowerShell, Git, Node/npm, Python, uv/uvx, VS Code, gh et glab fonctionnent ; Sysinternals est accessible sans lancer une fonction privilégiée |
+| Permissions uv machine | La phase 20 corrige automatiquement le seul paquet uv avec Users RX, sans ajout de droits d'écriture ; une reprise ne modifie pas les ACL déjà conformes |
+| Cibles portables inattendues | Racine personnalisée, jonction dans le paquet ou cible uv/uvx hors du paquet : erreur avant correction récursive ; aucune permission élargie ailleurs |
 | Reboot 3010 | Reprise avec mêmes paramètres ; rester dans le bloc administrateur tant qu’il n’est pas terminé |
 | None | Aucune installation Docker/SSH/WSL demandée par Docker ; existants non supprimés |
 | RemoteCLI | Aucun WSL ou Desktop installé ; seul le client machine et SSH sont préparés |
@@ -23,7 +25,7 @@ Utiliser une VM Windows 11 Pro x64 de qualification avec deux comptes distincts,
 | Oracle activé | Binaires/JDK préparés avant fin du bloc admin ; SQLcl et extension fonctionnent sous le compte standard |
 | Confirmation login | Une confirmation d’un autre SID ou l’ancien booléen partagé ne valide pas le compte cible |
 | Logs | Dossiers personnels, aucun token ni sortie native brute ; dépôt conservé sans écriture utilisateur |
-| CheckOnly | Aucun installateur, contexte, PATH, service ou fonctionnalité modifié ; logs et diagnostics autorisés |
+| CheckOnly | Aucun installateur, contexte, PATH, ACL, service ou fonctionnalité modifié ; logs et diagnostics autorisés |
 | Protections | Defender, SmartScreen, UAC, pare-feu, réseau, VPN et RDP inchangés |
 
 ## Risques et limites

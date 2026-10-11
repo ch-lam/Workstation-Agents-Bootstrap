@@ -10,6 +10,7 @@ Invoke-Phase '20-winget-packages' {
     foreach ($package in @(Get-MachinePackagePlan)) {
         Ensure-WinGet $package.Id $package.Extra -Scope machine
         if ($script:Reboot) { return }
+        if ($package.Id -eq 'astral-sh.uv') { Ensure-UvMachineAccess }
     }
     Ensure-OracleDeveloper
     if (-not $script:Check -and -not $script:Reboot) { Test-MachineTools }
