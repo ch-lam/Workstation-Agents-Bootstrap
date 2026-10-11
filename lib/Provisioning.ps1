@@ -35,10 +35,41 @@ function Get-MachinePackagePlan {
     foreach ($package in $catalog.Machine) { $package }
     @{Id=$script:Config.PythonPackage;Extra=@();Commands=@('python.exe')}
 }
+function Get-MachinePathDirectories {
+    @(([Environment]::GetEnvironmentVariable('PATH','Machine') -split ';') | Where-Object {$_} | ForEach-Object {[Environment]::ExpandEnvironmentVariables($_).Trim('"').TrimEnd('\')})
+}
+function Test-PythonMachineInstallation {
+    param([string]$Id)
+    # Python's Burn registration can be reported as User by WinGet even for
+    # InstallAllUsers=1. Accept only independently verified machine runtimes.
+    if ($Id -notmatch '^Python\.Python\.(3\.\d+)$') { return $false }
+    $minor=$Matches[1]
+    foreach ($tag in @($minor,($minor+'-32'),($minor+'-64'))) {
+        if (Test-Path -LiteralPath "HKCU:\SOFTWARE\Python\PythonCore\$tag\InstallPath") { return $false }
+    }
+    $executables=@(@(foreach ($tag in @($minor,($minor+'-64'))) {
+        $key="HKLM:\SOFTWARE\Python\PythonCore\$tag\InstallPath"
+        $registration=Get-ItemProperty -LiteralPath $key -ErrorAction SilentlyContinue
+        if ($registration -and $registration.PSObject.Properties['(default)']) {
+            $directory=[string]$registration.'(default)'
+            if ($directory -and [IO.Path]::IsPathRooted($directory)) {
+                $candidate=Join-Path ([IO.Path]::GetFullPath($directory)) 'python.exe'
+                if (Test-Path -LiteralPath $candidate -PathType Leaf) { $candidate }
+            }
+        }
+    }) | Select-Object -Unique)
+    if ($executables.Count -ne 1) { return $false }
+    $executable=$executables[0]
+    if (-not $env:ProgramFiles -or -not $executable.StartsWith(($env:ProgramFiles.TrimEnd('\')+'\'),[StringComparison]::OrdinalIgnoreCase)) { return $false }
+    if (@(Get-MachinePathDirectories) -notcontains (Split-Path $executable -Parent).TrimEnd('\')) { return $false }
+    try { $version=(Invoke-Native $executable @('--version') -Quiet).Output.Trim() }
+    catch { return $false }
+    return ($version -match ('^Python '+[regex]::Escape($minor)+'\.\d+(?:\S*)?$'))
+}
 function Test-MachineTools {
     param([string[]]$Commands=@((Get-MachinePackagePlan) | ForEach-Object {$_.Commands}))
     # Check actual resolution as well as package scope, including from the standard session.
-    $machinePath=@(([Environment]::GetEnvironmentVariable('PATH','Machine') -split ';') | Where-Object {$_} | ForEach-Object {[Environment]::ExpandEnvironmentVariables($_).Trim('"').TrimEnd('\')})
+    $machinePath=@(Get-MachinePathDirectories)
     foreach ($command in $Commands) {
         $resolved=Get-Command $command -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
         if (-not $resolved) { Add-Result $command FAIL 'Machine tool unavailable in this session; finish phase 20 and reopen the terminal'; continue }

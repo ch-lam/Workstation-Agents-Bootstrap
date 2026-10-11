@@ -130,6 +130,10 @@ function Get-WinGetState {
     $arguments=@('list','--id',$Id,'--exact','--source','winget','--disable-interactivity')
     if ($Scope) { $arguments+=@('--scope',$Scope) }
     $r = Invoke-Native 'winget.exe' $arguments @(0,$noApps) -Quiet
+    if ($r.Code -eq $noApps -and $Scope -eq 'machine' -and (Test-PythonMachineInstallation $Id)) {
+        Add-Result $Id WARN 'WinGet scope mismatch: machine Python independently verified via HKLM PythonCore, Program Files executable/version and machine PATH; no reinstall. No same-version HKCU runtime detected.'
+        return $true
+    }
     return ($r.Code -eq 0)
 }
 function Ensure-WinGet {
@@ -139,7 +143,7 @@ function Ensure-WinGet {
     }
     if ($Extra -contains '--scope') { throw 'Use the Scope parameter, not Extra, for installation scope' }
     if (Get-WinGetState $Id -Scope $Scope) { Add-Result $Id PASS "Already installed ($Scope); no automatic upgrade"; return }
-    if (Get-WinGetState $Id) { throw "$Id exists in a different scope. Review migration manually; no duplicate installation or automatic uninstall." }
+    if (Get-WinGetState $Id) { throw "$Id is detected by WinGet but its requested scope ($Scope) could not be verified. Inspect installed paths/registrations; this may be a scope inventory mismatch. No duplicate installation or automatic uninstall." }
     Invoke-Change "Install $Id" {
         # Explicit source, exact IDs and normal hash checks. Never override hash/security checks.
         $null = Invoke-Native 'winget.exe' (@('show','--id',$Id,'--exact','--source','winget','--accept-source-agreements','--disable-interactivity'))
