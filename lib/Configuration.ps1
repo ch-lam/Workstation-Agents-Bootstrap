@@ -1,5 +1,7 @@
 ﻿Set-StrictMode -Version Latest
 
+. (Join-Path $PSScriptRoot 'Settings.ps1')
+
 function ConvertTo-DataLiteral {
     param([AllowNull()]$Value)
     if ($null -eq $Value) { return '$null' }
@@ -34,7 +36,7 @@ function Get-BootstrapLaunchCommand {
 function Get-ApplyNextStep {
     param([string]$Root,[string]$ConfigPath,[string]$Phase)
     $nextPhase=if ($Phase -eq '00') {'10,20,50'} else {$Phase}
-    $session=if ($Phase -in @('00','10','20','50')) {'Administrator terminal, same Windows account'} else {'Normal non-elevated terminal, same Windows account'}
+    $session=if ($Phase -in @('00','10','20','50')) {'Administrator terminal; finish 10,20,50 before switching accounts'} else {'Normal non-elevated terminal under the target workstation user'}
     $command=Get-BootstrapLaunchCommand (Join-Path $Root 'Invoke-Bootstrap.ps1') $ConfigPath -Phase $nextPhase
     [pscustomobject]@{Command=$command;Session=$session}
 }
@@ -42,19 +44,19 @@ function Get-BootstrapContinuation {
     param([string]$Root,[string]$ConfigPath,[string]$Phase,[bool]$CheckOnly)
     if ($Phase -eq '70') { return $null }
     if ($CheckOnly) { return Get-ApplyNextStep $Root $ConfigPath $Phase }
-    if ($Phase -eq '60' -and -not (Import-PowerShellDataFile -LiteralPath $ConfigPath).BackendLoginConfirmed) {
+    if ($Phase -eq '60' -and -not (Test-BackendConfirmation)) {
         $command=Get-BootstrapLaunchCommand (Join-Path $Root 'Configure-Bootstrap.ps1') $ConfigPath
         return [pscustomobject]@{
             Command=($command+' -Action ConfirmLogin')
-            Session='Normal non-elevated PowerShell 7 terminal, same Windows account'
+            Session='Normal non-elevated PowerShell 7 terminal under the target workstation user'
             Detail=(Get-BackendLoginInstructions $Root $ConfigPath)
         }
     }
     $next=@{'00'='10,20,50';'10'='20,50';'20'='50';'30'='40,60';'40'='60';'50'='30,40,60';'60'='70'}[$Phase]
-    $session=if ($Phase -in @('00','10','20')) {'Administrator terminal, same Windows account'} else {'New normal non-elevated PowerShell 7 terminal, same Windows account'}
+    $session=if ($Phase -in @('00','10','20')) {'Administrator terminal; finish 10,20,50 before switching accounts'} else {'Normal non-elevated PowerShell 7 terminal under the target workstation user'}
     $command=Get-BootstrapLaunchCommand (Join-Path $Root 'Invoke-Bootstrap.ps1') $ConfigPath -Phase $next
     $detail=switch ($Phase) {
-        '50' {'Open Docker Desktop as the normal user, complete first-run setup and wait for the Linux engine if Docker is enabled.'}
+        '50' {'Administrator block complete. Switch once to the target standard account for 30,40,60, logins and 70. For LocalDesktop/Both, start Docker Desktop there and wait for its Linux engine.'}
         '60' {'Before validation, complete manual backend login and confirm it through Configure-Bootstrap.ps1 -Action ConfirmLogin.'}
         default {''}
     }
@@ -86,7 +88,7 @@ Claude : lancer claude, suivre le login navigateur (ou /login dans Claude), pose
 Codex : lancer codex login, terminer le login navigateur, puis codex et tester une conversation avant de quitter.
 Apres une conversation reussie, confirmer et enregistrer avec :
 $confirm
-Cet assistant enregistre BackendLoginConfirmed=true dans la configuration utilisee.
+Cet assistant enregistre une confirmation personnelle liee au SID Windows, hors du depot et de la configuration partagee.
 ENSUITE seulement, lancer la validation :
 $resume
 Les logins GitHub (gh auth login) et Grok (grok login) sont independants de ce prerequis.

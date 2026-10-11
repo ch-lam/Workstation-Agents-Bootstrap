@@ -9,12 +9,9 @@ Invoke-Phase '30-dev-runtime' {
     Require-User
     $null = Test-NodeMinimum
     $null = Test-Tool npm.cmd
-    Ensure-WinGet $script:Config.PythonPackage @('--scope','user')
-    Ensure-WinGet 'astral-sh.uv'
-    if (-not $script:Check) {
-        $null = Test-Tool python.exe
-        $null = Test-Tool uv.exe
-        $null = Test-Tool uvx.exe
-    }
+    Test-MachineTools
+    Ensure-WinGet 'Microsoft.WindowsTerminal' -Scope user
+    foreach ($tool in @('python.exe','uv.exe','uvx.exe')) { $null=Test-Tool $tool }
+    Test-OracleDeveloper -EffectiveEnvironment
     Add-Result 'Native build tools' MANUAL 'Only for source builds lacking prebuilt modules: install Visual Studio C++ Build Tools (Desktop development with C++) and compatible Python; optional for the common workstation base.'
 } $ConfigPath -CheckOnly:$CheckOnly -WindowsUpdateMandatory:$WindowsUpdateMandatory

@@ -7,9 +7,12 @@ if (-not $ConfigPath) {
 . (Join-Path $PSScriptRoot 'lib\Common.ps1')
 Invoke-Phase '60-workstation-config' {
     Require-User
+    Ensure-DockerContexts
+    $extensionsToInstall=@($script:Config.Extensions)
+    if ($script:Config.OracleDeveloper.Enabled) { $extensionsToInstall+= $script:Config.OracleDeveloper.VSCodeExtension }
     if (Get-Command code -ErrorAction SilentlyContinue) {
         $extensions = ((Invoke-Native code @('--list-extensions') -Quiet).Output -split "`r?`n")
-        foreach ($extension in $script:Config.Extensions) {
+        foreach ($extension in @($extensionsToInstall | Select-Object -Unique)) {
             if ($extensions -contains $extension) { Add-Result $extension PASS 'Installed' }
             else { Invoke-Change "VS Code $extension" { $null = Invoke-Native code @('--install-extension',$extension) } }
         }
@@ -23,7 +26,10 @@ Invoke-Phase '60-workstation-config' {
         else { Invoke-Change "Git $key" { $null = Invoke-Native git.exe @('config','--global',$key,$pairs[$key]) } }
     }
     Add-Result 'Terminal / encoding' MANUAL 'Select PowerShell 7 as Windows Terminal default profile. No system locale or UTF-8 registry change required.'
-    if (-not $script:Config.BackendLoginConfirmed) {
+    if ($script:Config.OpenRouter.Enabled) {
+        Add-Result 'OpenRouter' MANUAL "Configure your compatible client with https://openrouter.ai/api/v1 and a secret supplied through $($script:Config.OpenRouter.ApiKeyEnvironmentVariable). No secret value is read or saved; Timon setup remains separate."
+    }
+    if (-not (Test-BackendConfirmation)) {
         Add-Result 'LOGIN REQUIS AVANT PHASE 70' MANUAL (Get-BackendLoginInstructions $script:Root $script:ActiveConfigPath)
     } else {
         Add-Result 'Backend login confirmation' INFO 'Conversation Claude ou Codex deja confirmee dans cette configuration ; vous pouvez passer a la phase 70.'

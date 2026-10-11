@@ -9,11 +9,8 @@ $ErrorActionPreference='Stop'
 if (-not $ConfigPath) { $ConfigPath=Join-Path $PSScriptRoot 'config.local.psd1' }
 $script:WindowsUpdateMandatory=[bool]$WindowsUpdateMandatory
 . (Join-Path $PSScriptRoot 'lib\Configuration.ps1')
-$config=Import-PowerShellDataFile -LiteralPath (Join-Path $PSScriptRoot 'config.psd1')
-if (Test-Path -LiteralPath $ConfigPath) {
-    $existing=Import-PowerShellDataFile -LiteralPath $ConfigPath
-    foreach ($key in $existing.Keys) { if ($config.ContainsKey($key)) { $config[$key]=$existing[$key] } }
-}
+$source=if (Test-Path -LiteralPath $ConfigPath) {$ConfigPath} else {Join-Path $PSScriptRoot 'config.psd1'}
+$config=Read-BootstrapConfig $source
 Write-Host "`nAssistant de configuration - workstation d'agents"
 Write-Host 'Entree conserve la valeur proposee. Aucun logiciel ne sera installe.'
 if ($Action -eq 'Menu') {
@@ -23,7 +20,7 @@ if ($Action -eq 'Menu') {
 }
 switch ($Action) {
     'Configuration' {
-        $config.EnableDocker=Read-YesNo 'Preparer Docker et WSL2' $config.EnableDocker
+        $config.DockerMode=Read-Answer 'Docker : None, LocalDesktop, RemoteCLI, Both' $config.DockerMode {param($v) $v -in @('None','LocalDesktop','RemoteCLI','Both')}
         $config.NoSleepOnAC=Read-YesNo 'Empecher veille/hibernation automatique sur secteur' $config.NoSleepOnAC
         $config.GitUserName=Read-Answer 'Nom Git (vide : conserver la configuration existante)' $config.GitUserName
         $config.GitUserEmail=Read-Answer 'Email Git (vide : conserver la configuration existante)' $config.GitUserEmail
@@ -45,8 +42,11 @@ switch ($Action) {
         Write-Host 'Voir README pour les sessions admin/utilisateur des phases suivantes.'
     }
     'ConfirmLogin' {
-        $config.BackendLoginConfirmed=Read-YesNo 'Avez-vous reussi une vraie conversation Claude ou Codex, sous le compte Windows qui executera le harness' $false
-        $null=Save-DataFile $config $ConfigPath -PreviewOnly:$PreviewOnly
+        $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
+        if (([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Confirm login in the target non-elevated user session.' }
+        $confirmed=Read-YesNo 'Avez-vous reussi une vraie conversation Claude ou Codex, sous ce compte Windows qui executera le harness' $false
+        $state=@{Confirmed=$confirmed;UserSID=(Get-CurrentUserSid);Timestamp=(Get-Date).ToString('o')}
+        $null=Save-DataFile $state (Join-Path (Get-BootstrapUserDirectory) 'backend-confirmation.psd1') -PreviewOnly:$PreviewOnly
         Write-Host 'Apres enregistrement, copiez-collez cette commande dans un terminal normal pour valider le socle :'
         Write-Host (Get-BootstrapLaunchCommand (Join-Path $PSScriptRoot 'Invoke-Bootstrap.ps1') $ConfigPath -Phase '70')
     }

@@ -4,6 +4,8 @@ $root=Split-Path $PSScriptRoot -Parent
 $script:Root=$root
 $script:ActiveConfigPath=Join-Path $root 'config.psd1'
 $script:Config=@{BackendLoginConfirmed=$false}
+$script:confirmed=$false
+function Test-BackendConfirmation { return $script:confirmed }
 $script:results=New-Object 'System.Collections.Generic.List[object]'
 function Require-User {}
 function Add-Result { param($Name,$Status,$Detail);$script:results.Add([pscustomobject]@{Name=$Name;Status=$Status;Detail=$Detail}) }
@@ -16,6 +18,6 @@ $body=$command.CommandElements[2].ScriptBlock.GetScriptBlock()
 if (@($script:results | Where-Object Status -eq 'FAIL').Count -ne 1) { throw 'Missing early login failure' }
 $instructions=($script:results | Where-Object Status -eq 'MANUAL').Detail
 if ($instructions -notmatch 'codex login' -or $instructions -notmatch 'Claude OU Codex' -or $instructions -notmatch '-Action ConfirmLogin' -or $instructions -notmatch [regex]::Escape($script:ActiveConfigPath)) { throw 'Incomplete login instructions' }
-$script:Config.BackendLoginConfirmed=$true
+$script:confirmed=$true
 try { & $body;throw 'Expected validation call' } catch { if ($_.Exception.Message -ne 'Validation reached') { throw } }
 Write-Host '3 backend login checks passed; no login, update search or installation executed.'

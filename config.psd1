@@ -5,7 +5,17 @@
     WindowsUpdateTimeoutSeconds = 180
     MinimumRAMGB = 8
     RecommendedRAMGB = 16
-    EnableDocker = $true
+    SchemaVersion = 2
+    DockerMode = 'LocalDesktop' # None, LocalDesktop, RemoteCLI, Both; legacy EnableDocker is still accepted.
+    DockerLocalContext = 'desktop-linux'
+    DockerRemoteContexts = @() # @{ Name='remote-dev'; Host='ssh://user@host'; Required=$true }
+    OracleDeveloper = @{
+        Enabled = $false
+        SqlclHome = '' # Official distribution installed during the administrator block; docs/ORACLE.md.
+        JavaHome = ''
+        VSCodeExtension = 'Oracle.oracledevtools'
+    }
+    OpenRouter = @{ Enabled = $false; BaseUrl = 'https://openrouter.ai/api/v1'; ApiKeyEnvironmentVariable = 'OPENROUTER_API_KEY' }
     NoSleepOnAC = $true
     # Observe Windows/domain time policy; never replace the configured peers.
     ResyncTime = $false
@@ -27,5 +37,5 @@
     # Optional exact npm versions; empty installs latest ONLY when absent.
     CodexVersion = ''
     GrokVersion = ''
-    BackendLoginConfirmed = $false # Set true only after a real Claude/Codex session.
+    BackendLoginConfirmed = $false # Legacy only; confirmation is now stored separately per Windows SID.
 }
